@@ -28,15 +28,41 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
     [(member (first params) (rest params)) (report-error 'duplicate-name (first params))]
     [else
      (check-duplicate-param (rest params))
-    ])
-)
+     ])
+  )
 
 (define (check-function id env)
   (if
-    (interpret env (list 'procedure? id)) (void)
-    (report-error 'not-a-function id)
+   (interpret env (list 'procedure? id)) (void)
+   (report-error 'not-a-function id)
+   )
+  )
+
+(define (check-unbound-name id env)
+  (if
+   (hash-has-key? env id) (void)
+   (report-error 'unbound-name id)
+   )
+  )
+
+(define (check-invalid-contract id env)
+  (check-unbound-name id env)
+  (if
+   (interpret env (list 'procedure? id)) (void)
+   (report-error 'invalid-contract id)
+   )
+  (let* ([f-closure (hash-ref env id)]
+         [contract (closure-contract f-closure)]
+         [params (closure-params f-closure)])
+    (match contract
+      [(list con-expr-for-params ... '-> con-expr-for-return)
+       (if (equal? (length params) (length con-expr-for-params)) (void)
+           (report-error 'invalid-contract id))
+       ]
+      [else void]
+      )
     )
-)
+  )
 
 (define (check-contract-violation id args env)
   (let* ([f-closure (hash-ref env id)]
@@ -45,7 +71,7 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
       [(list con-expr-for-args ... '-> con-expr-for-result) void]
       [else void])
     )
- )
+  )
 
 
 
@@ -76,7 +102,9 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
   (match expr
     [(? number?) expr] ; handle literals
     [(? boolean?) expr]
-    [(? symbol?) (interpret env (hash-ref env expr))] ; handle variable
+    [(? symbol?)
+     (check-unbound-name expr env)
+     (interpret env (hash-ref env expr))] ; handle variable
     [(list '+ a b) (+ (interpret env a) (interpret env b))] ; handle builtin functions
     [(list '< a b) (< (interpret env a) (interpret env b))]
     [(list 'equal? a b) (equal? (interpret env a) (interpret env b))]
@@ -92,7 +120,9 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
        ['boolean? #t]
        ['procedure? #t]
        [(list 'lambda params expr) #t] ; anon function
-       [(? symbol?) (if (hash-has-key? env possible-procedure) (closure? (hash-ref env possible-procedure)) #f)] ; identifier refers to a closure in env; TODO: consider case where possible-procedure isn't even defined
+       [(? symbol?)
+        (check-unbound-name possible-procedure env)
+        (closure? (hash-ref env possible-procedure))] ; identifier refers to a closure in env; TODO: consider case where possible-procedure isn't even defined
        )]
     ; handle lambda def, return closure
     [(list 'lambda params expr)
@@ -103,6 +133,7 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
      (match ID
        [(list 'lambda params expr) (interpret (add-params-mapping env params args ) expr) ] ; anon n-ary non 
        [else
+        (if (symbol? ID) (check-unbound-name ID env) void)
         (check-function ID env)
         (check-contract-violation ID args env)
         (interpret (add-params-mapping (closure-env (hash-ref env ID)) (closure-params (hash-ref env ID)) args ) (closure-body (hash-ref env ID)))]) ; n-ary call
@@ -154,13 +185,13 @@ Racket structs, feel free to switch this implementation to use a list/hash inste
        )
      ]
     [(list 'define-contract ID contract)
-     ;(check-invalid-contract) ; TODO:
+     (check-invalid-contract ID env)
      (let* ([orig-closure (hash-ref env ID)] 
             [params (closure-params orig-closure)]
             [body (closure-body orig-closure)]
             [env (closure-env orig-closure)]
             [new-closure (closure params body env contract)])
-        (hash-set env ID new-closure) 
+       (hash-set env ID new-closure) 
        )
 
      ] ; case contract
@@ -169,13 +200,13 @@ Racket structs, feel free to switch this implementation to use a list/hash inste
 
 (define (add-params-mapping env params args)
   (if (equal? (length params) (length args)) 
-  (let
-      ([update-params-mapping (lambda(param params-mapping) (hash-set params-mapping param (interpret env (list-ref args (index-of params param))) ) )])
-    (foldl update-params-mapping env params)
-    )
-  (report-error 'arity-mismatch (length args) (length params))
+      (let
+          ([update-params-mapping (lambda(param params-mapping) (hash-set params-mapping param (interpret env (list-ref args (index-of params param))) ) )])
+        (foldl update-params-mapping env params)
+        )
+      (report-error 'arity-mismatch (length args) (length params))
+      )
   )
-)
 
 ;(add-params-mapping (build-env '((define a 4) (define b 4))) (list) (list))
 
