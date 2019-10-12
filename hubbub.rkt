@@ -31,12 +31,12 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
     ])
 )
 
-#|(define (check-function id env)
+(define (check-function id env)
   (if
-    (equal? (interpret env (procedure? id)) #t) (void)
+    (interpret env (list 'procedure? id)) (void)
     (report-error 'not-a-function id)
     )
-)|#
+)
 
 
 
@@ -85,7 +85,7 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
        ['boolean? #t]
        ['procedure? #t]
        [(list 'lambda params expr) #t] ; anon function
-       [(? symbol?) (closure? (hash-ref env possible-procedure))] ; identifier refers to a closure in env
+       [(? symbol?) (if (hash-has-key? env possible-procedure) (closure? (hash-ref env possible-procedure)) #f)] ; identifier refers to a closure in env; TODO: consider case where possible-procedure isn't even defined
        )]
     ; handle lambda def, return closure
     [(list 'lambda params expr)
@@ -96,6 +96,7 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
      (match ID
        [(list 'lambda params expr) (interpret (add-params-mapping env params args ) expr) ] ; anon n-ary non 
        [else
+        (check-function ID env)
         (interpret (add-params-mapping (closure-env (hash-ref env ID)) (closure-params (hash-ref env ID)) args ) (closure-body (hash-ref env ID)))]) ; n-ary call
      ] 
     )
