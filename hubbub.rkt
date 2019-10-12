@@ -52,7 +52,7 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
 |#
 (define (run-interpreter prog)
   (match prog
-    [(list bindings ... expr) (interpret (build-env bindings) expr)]
+    [(list bindings-or-contracts ... expr) (interpret (build-env bindings-or-contracts) expr)]
     )
   )
 
@@ -90,13 +90,14 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
     ; handle lambda def, return closure
     [(list 'lambda params expr)
      (check-duplicate-param params)
-     (closure params expr env)]
+     (closure params expr env void)]
     ; handle function call
     [(list ID args ...)
      (match ID
        [(list 'lambda params expr) (interpret (add-params-mapping env params args ) expr) ] ; anon n-ary non 
        [else
         (check-function ID env)
+        (check-contract-violation)
         (interpret (add-params-mapping (closure-env (hash-ref env ID)) (closure-params (hash-ref env ID)) args ) (closure-body (hash-ref env ID)))]) ; n-ary call
      ] 
     )
@@ -130,21 +131,32 @@ Read more at https://docs.racket-lang.org/guide/define-struct.html.
 You can and should modify this as necessary. If you're having trouble working with
 Racket structs, feel free to switch this implementation to use a list/hash instead.
 |#
-(struct closure (params body env))
+(struct closure (params body env contract))
 
 ; environment builders
-(define (build-env bindings) 
-  (foldl update_env builtins bindings))
+(define (build-env bindings-or-contracts) 
+  (foldl update_env (hash) bindings-or-contracts))
 
-(define (update_env binding env)
-  (match binding
-    [(list 'define ID b)
+(define (update_env binding-or-contract env)
+  (match binding-or-contract
+    [(list 'define ID b) ; case binding 
      (check-duplicate-define ID env)
      (match b 
        [(? symbol?) (hash-set env ID (hash-ref env b))] ; variable define b = a
        [else (hash-set env ID (interpret env b))] ; want ID to val binding, not ID to expr
        )
      ]
+    [(list 'define-contract ID contract)
+     (check-invalid-contract) ; TODO:
+     (let* ([orig-closure (hash-ref env ID)] 
+            [params (closure-params orig-closure)]
+            [body (closure-body orig-closure)]
+            [env (closure-env orig-closure)]
+            [new-closure (closure params body env contract)])
+        (hash-set env ID new-closure) 
+       )
+
+     ] ; case contract
     )
   )
 
@@ -168,4 +180,5 @@ Racket structs, feel free to switch this implementation to use a list/hash inste
 
 
 ; TODO: define an anon, then call it >> this does not seem to require a closure
-
+; TODO: builtin shadowing
+; unbound name issues
