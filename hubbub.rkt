@@ -38,7 +38,14 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
     )
 )
 
-
+(define (check-contract-violation id args env)
+  (let* ([f-closure (hash-ref env id)]
+         [contract (closure-contract f-closure)])
+    (match contract
+      [(list con-expr-for-args ... '-> con-expr-for-result) void ]
+      [else void])
+    )
+ )
 
 
 
@@ -97,7 +104,7 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
        [(list 'lambda params expr) (interpret (add-params-mapping env params args ) expr) ] ; anon n-ary non 
        [else
         (check-function ID env)
-        (check-contract-violation)
+        (check-contract-violation ID args env)
         (interpret (add-params-mapping (closure-env (hash-ref env ID)) (closure-params (hash-ref env ID)) args ) (closure-body (hash-ref env ID)))]) ; n-ary call
      ] 
     )
@@ -147,7 +154,7 @@ Racket structs, feel free to switch this implementation to use a list/hash inste
        )
      ]
     [(list 'define-contract ID contract)
-     (check-invalid-contract) ; TODO:
+     ;(check-invalid-contract) ; TODO:
      (let* ([orig-closure (hash-ref env ID)] 
             [params (closure-params orig-closure)]
             [body (closure-body orig-closure)]
