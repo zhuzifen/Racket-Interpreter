@@ -78,6 +78,12 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
     ; check whether procedure
     [(list 'procedure? possible-procedure)
      (match possible-procedure
+       ['+ #t] ; build in functions are procedures
+       ['< #t]
+       ['equal? #t]
+       ['integer? #t]
+       ['boolean? #t]
+       ['procedure? #t]
        [(list 'lambda params expr) #t] ; anon function
        [(? symbol?) (closure? (hash-ref env possible-procedure))] ; identifier refers to a closure in env
        )]
@@ -102,7 +108,7 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
 ; A hash mapping symbols for Hubbub builtin functions to their corresponding Racket value.
 (define builtins
   (hash
-   '+ (closure params '() (hash))
+   '+ +
    'equal? equal?
    '< <
    'integer? integer?
