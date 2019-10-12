@@ -42,7 +42,7 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
   (let* ([f-closure (hash-ref env id)]
          [contract (closure-contract f-closure)])
     (match contract
-      [(list con-expr-for-args ... '-> con-expr-for-result) void ]
+      [(list con-expr-for-args ... '-> con-expr-for-result) void]
       [else void])
     )
  )
