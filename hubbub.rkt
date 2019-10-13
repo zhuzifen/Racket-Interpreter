@@ -41,19 +41,11 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
 (define (check-unbound-name id env)
   (if
    (hash-has-key? env id) (void)
-  (report-error 'unbound-name id)
+   (report-error 'unbound-name id)
    )
   )
 
-(define (check-invalid-contract id env)
-  (check-unbound-name id env)
-  (if
-   (interpret env (list 'procedure? id)) (void)
-   (report-error 'invalid-contract id)
-   )
-  (let* ([f-closure (hash-ref env id)]
-         [contract (closure-contract f-closure)]
-         [params (closure-params f-closure)])
+(define (check-invalid-contract id params contract)
     (match contract
       [(list con-expr-for-params ... '-> con-expr-for-return)
        (if (equal? (length params) (length con-expr-for-params)) (void)
@@ -61,18 +53,18 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
        ]
       [else void]
       )
-    )
   )
 
 ;------------------------------------------------------CONTRACT VIOLATION CHECK-----------------------------------------------------
-(define (check-contract-violation id args env)
+#|(define (check-contract-violation id args env)
   (match id
     ; only need to check contract violation on functions with identifiers
-    [(? symbol?) (let* ([f-closure (hash-ref env id)]
+    [(? symbol?) (check-unbound-name id env)
+     (let* ([f-closure (hash-ref env id)]
          [contract (closure-contract f-closure)])
     (match contract
       [(list con-expr-for-args ... '-> con-expr-for-result)
-       (if (and (list (is-args-good con-expr-for-args args) (is-result-good con-expr-for-result args f-closure)))
+       (if (and (is-args-good con-expr-for-args args) (is-result-good con-expr-for-result args f-closure))
            (void)
            (report-error 'contract-violation))
        ]
@@ -86,7 +78,7 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
 
 ; we assume at this point that the contract is valid, so that the number of con-exprs is equal to that of args
 (define (is-args-good con-exprs args)
-  (let* ([is-satisfy-contract-for-arg (lambda (contract) (is-satisfy-contract contract (list-ref args (index-of con-exprs contract))) )])
+  (let* ([is-satisfy-contract-for-arg (lambda (contract) (is-satisfy-contract contract (list-ref args (index-of con-exprs contract))))])
     (andmap is-satisfy-contract-for-arg con-exprs)
     )
   )
@@ -104,7 +96,7 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
   (let ([f-value (interpret (hash 'args args) f-closure)])
     (is-satisfy-contract contract f-value)
     )
-  )
+  )|#
 
 ;-----------------------------------------------------------INTERPRETER MAIN CODE----------------------------------------------------------
 #|
@@ -230,7 +222,7 @@ Racket structs, feel free to switch this implementation to use a list/hash inste
 (define (build-env bindings-or-contracts) 
   (foldl update_env builtins bindings-or-contracts))
 
-(define (update_env binding-or-contract env)
+(define (update-env binding-or-contract env)
   (match binding-or-contract
     [(list 'define ID b) ; case binding 
      (check-duplicate-define ID env)
@@ -240,15 +232,20 @@ Racket structs, feel free to switch this implementation to use a list/hash inste
        )
      ]
     [(list 'define-contract ID contract)
-     (check-invalid-contract ID env)
+     (check-unbound-name ID env)
+     (if
+      (interpret env (list 'procedure? ID)) (void)
+      (report-error 'invalid-contract ID)
+      )
      (let* ([orig-closure (hash-ref env ID)] 
             [params (closure-params orig-closure)]
             [body (closure-body orig-closure)]
             [env (closure-env orig-closure)]
             [new-closure (closure params body env contract)])
-       (hash-set env ID new-closure) 
+       (check-invalid-contract ID params contract)
+       (hash-set env ID new-closure)
        )
-
+     ;(check-invalid-contract ID env)
      ] ; case contract
     )
   )
@@ -265,9 +262,9 @@ Racket structs, feel free to switch this implementation to use a list/hash inste
 
 
 #;(run-interpreter '((define a (+ 4 4))
-                   (define b 4)
-                   (define c #f)
-                   (+ a b) ))
+                     (define b 4)
+                     (define c #f)
+                     (+ a b) ))
 
 ;-------------------------------------------------------------DEBUGGING-----------------------------------------------
 (require racket/trace)
