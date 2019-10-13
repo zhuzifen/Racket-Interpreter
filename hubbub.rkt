@@ -73,8 +73,7 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
     )]
     ; it's an anon func, so no need to check for contract violations
     [else void]
-    )
-  )
+    ))
 
 ; we assume at this point that the contract is valid, so that the number of con-exprs is equal to that of args
 (define (is-args-good con-exprs args)
@@ -88,7 +87,7 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
     ; anything works 
     ['any #t]
     ; contract is a predicate, so just call it using our interpreter
-    [else (interpret (hash) (list contract value))]
+    [else (interpret builtins (list contract value))]
     )
   )
 
@@ -142,7 +141,7 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
           ; checks
           ;(if (symbol? ID)
           (check-function ID env)
-          ;(check-contract-violation ID evaluated-args env)
+          (check-contract-violation ID evaluated-args env)
           ; finally we can start interpreting
           (interpret (hash 'args evaluated-args) (interpret env ID))
 
