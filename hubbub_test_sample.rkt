@@ -119,7 +119,11 @@ tests here
 
 
   
-
+  (test-equal? "Test builtin shadowing"
+                 (run-interpreter '((define weird-add (lambda (a) (+ a a)))
+                                    (define f (lambda (+ a) (+ a) ))
+                                    (f weird-add 5)
+                                    )) 10)
 
 
   #;(test-equal? "Contract: (integer? -> boolean?), valid call"
