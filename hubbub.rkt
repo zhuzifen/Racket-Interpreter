@@ -209,7 +209,7 @@ Racket structs, feel free to switch this implementation to use a list/hash inste
 
 ; environment builders
 (define (build-env bindings-or-contracts) 
-  (foldl update_env builtins bindings-or-contracts))
+  (foldl update_env (hash) bindings-or-contracts))
 
 (define (update_env binding-or-contract env)
   (match binding-or-contract
