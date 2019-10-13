@@ -71,15 +71,17 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
     [(? symbol?) (let* ([f-closure (hash-ref env id)]
          [contract (closure-contract f-closure)])
     (match contract
-      [(list con-expr-for-args ... '-> con-expr-for-result) (and (is-args-good con-expr-for-args args) (is-result-good con-expr-for-result args f-closure))]
+      [(list con-expr-for-args ... '-> con-expr-for-result)
+       (if (and (list (is-args-good con-expr-for-args args) (is-result-good con-expr-for-result args f-closure)))
+           (void)
+           (report-error 'contract-violation))
+       ]
       ; there is no contract, so don't bother checking 
       [else void])
     )]
+    ; it's an anon func, so no need to check for contract violations
     [else void]
     )
-
-
-  
   )
 
 ; we assume at this point that the contract is valid, so that the number of con-exprs is equal to that of args
@@ -90,8 +92,12 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
   )
 
 (define (is-satisfy-contract contract value)
-  ; contract is a predicate, so just call it using our interpreter
-  (interpret (hash) (list contract value))
+  (match contract
+    ; anything works 
+    ['any #t]
+    ; contract is a predicate, so just call it using our interpreter
+    [else (interpret (hash) (list contract value))]
+    )
   )
 
 (define (is-result-good contract args f-closure) 
