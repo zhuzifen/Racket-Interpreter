@@ -137,52 +137,63 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
     [(? symbol?)
      (check-unbound-name expr env)
      (hash-ref env expr)] ; handle variable
-    [(list '+ addands ...) ; handle builtin functions
-     (let ([interpret-with-env (lambda (num) (interpret env num))])
-       (apply + (map interpret-with-env addands))
-       )
-     ] 
-    [(list '< a b) (< (interpret env a) (interpret env b))]
-    [(list 'equal? a b) (equal? (interpret env a) (interpret env b))]
-    [(list 'integer? a) (integer? (interpret env a))]
-    [(list  'boolean? a) (boolean? (interpret env a))]
-    ; check whether procedure
-    [(list 'procedure? possible-procedure)
-     (match possible-procedure
-       ['+ #t] ; build in functions are procedures
-       ['< #t]
-       ['equal? #t]
-       ['integer? #t]
-       ['boolean? #t]
-       ['procedure? #t]
-       [else
-        (if (symbol? possible-procedure)
-        (check-unbound-name possible-procedure env) void)
-        (closure? (interpret env possible-procedure))] ; it's not a builtin
-       )]
     ; handle lambda def, return closure
     [(list 'lambda params expr)
      (check-duplicate-param params) (closure params expr env void)]
     ; handle function call
     [(list ID args ...)
-     (let* ([interpret-with-env (lambda (arg) (interpret env arg))]
-            [evaluated-args (map interpret-with-env args)])
-       ; checks
-       ;(if (symbol? ID)
-       (check-function ID env)
-       (check-contract-violation ID evaluated-args env)
-       ; finally we can start interpreting
-       (interpret (hash 'args evaluated-args) (interpret env ID))
-       ;(interpret env ID)
-       ) ; n-ary call; all we do is get the closure, then ask the interpreter to interpret the closure
-       
+     (cond
+       [(builtin? ID env) (handle-builtin (interpret env ID) env expr) ]    
+       [else
+        (let* ([interpret-with-env (lambda (arg) (interpret env arg))]
+               [evaluated-args (map interpret-with-env args)])
+          ; checks
+          ;(if (symbol? ID)
+          (check-function ID env)
+          ;(check-contract-violation ID evaluated-args env)
+          ; finally we can start interpreting
+          (interpret (hash 'args evaluated-args) (interpret env ID))
+
+          )
+        ]) 
      ]
     ; handle closure
     [(? closure?) (interpret (add-params-mapping (closure-env expr) (closure-params expr) (hash-ref env 'args))  (closure-body expr))] ; our env contains the args; we can use add-params-mapping to construt new env to eval our body
-    ;[(? closure?) (add-params-mapping (closure-env expr) (closure-params expr) (hash-ref env 'args))]
+    ;[(? closure?) (list (add-params-mapping (closure-env expr) (closure-params expr) (hash-ref env 'args)) (closure-body expr)) ]
     )
   )
 
+; our assumption is that ID-ref refers to the original builtin, not any shadowed version
+(define (handle-builtin ID-ref env expr)
+  (let* ([actual-expr (append (list ID-ref) (rest expr))])
+       (match actual-expr
+       [(list '+ addands ...) ; handle builtin functions
+        (let ([interpret-with-env (lambda (num) (interpret env num))])
+          (apply + (map interpret-with-env addands))
+          )
+        ] 
+       [(list '< a b) (< (interpret env a) (interpret env b))]
+       [(list 'equal? a b) (equal? (interpret env a) (interpret env b))]
+       [(list 'integer? a) (integer? (interpret env a))]
+       [(list  'boolean? a) (boolean? (interpret env a))]
+       ; check whether procedure
+       [(list 'procedure? possible-procedure)
+        (match possible-procedure
+          ['+ #t] ; build in functions are procedures
+          ['< #t]
+          ['equal? #t]
+          ['integer? #t]
+          ['boolean? #t]
+          ['procedure? #t]
+          [else
+           (if (symbol? possible-procedure)
+               (check-unbound-name possible-procedure env) void)
+           (closure? (interpret env possible-procedure))] ; it's not a builtin
+          )]
+       )
+       )
+
+  )
 
 ;-----------------------------------------------------------------------------------------
 ; Helpers: Builtins and closures
@@ -190,18 +201,20 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
 ; A hash mapping symbols for Hubbub builtin functions to their corresponding Racket value.
 (define builtins
   (hash
-   '+ +
-   'equal? equal?
-   '< <
-   'integer? integer?
-   'boolean? boolean?
+   '+ '+
+   'equal? 'equal?
+   '< '<
+   'integer? 'integer?
+   'boolean? 'boolean?
    ; Note: You'll almost certainly need to replace procedure? here to properly return #t
    ; when given your closure data structure at the end of Task 1!
-   'procedure? procedure?
+   'procedure? 'procedure?
    ))
 
-; Returns whether a given symbol refers to a builtin Hubbub function.
-(define (builtin? identifier) (hash-has-key? builtins identifier))
+; builtin when identifier refers to the original builtin
+(define (builtin? identifier env)
+  (hash-has-key? builtins (interpret env identifier))
+  )
 
 #|
 Starter definition for a closure "struct". Racket structs behave similarly to
@@ -215,7 +228,7 @@ Racket structs, feel free to switch this implementation to use a list/hash inste
 
 ; environment builders
 (define (build-env bindings-or-contracts) 
-  (foldl update_env (hash) bindings-or-contracts))
+  (foldl update_env builtins bindings-or-contracts))
 
 (define (update_env binding-or-contract env)
   (match binding-or-contract
@@ -251,25 +264,33 @@ Racket structs, feel free to switch this implementation to use a list/hash inste
   )
 
 
-;(add-params-mapping (build-env '((define a 4) (define b 4))) (list) (list))
-
 #;(run-interpreter '((define a (+ 4 4))
                    (define b 4)
                    (define c #f)
                    (+ a b) ))
 
+;-------------------------------------------------------------DEBUGGING-----------------------------------------------
+(require racket/trace)
 
+#;(trace-call (run-interpreter '( (define f3 (lambda (f1) (f1 0 5)))
+                                    (f3 <))))
 
 ; TODO: builtin shadowing
 ; TODO: finish contract stuff
-; TODO: fix hash table stuff for args >> functions 
+; TODO: checks for builtins
+
+                 #;(run-interpreter '((define a 10)
+                                    (define b 16)
+                                    (define f1 (lambda (x1) (+ 1 x1)))
+                                    (define f2 (lambda (x2) (+ 2 x2)))
+                                    (define f3 (lambda (f1 f2) (lambda (x) (equal? (f1 0 x) (f2 x)))))
+                                    ((f3 < integer?) 20)))
 
 
-#;(run-interpreter `((define a 10) (define b 16) (define g1 (lambda (x1) (+ 1 x1))) (define g2 (lambda (x2) (+ 2 x2))) ((lambda (f1 f2 x1 x2) (+ (f1 x1) (f2 x2))) g1 g2 1 1)))
+(run-interpreter '( (define f3 (lambda (f1) (f1 0 5)))
+                                    (f3 <)))
 
-(run-interpreter `((define a 10) (define b 16)
-                                 (define f1 (lambda (x1) (+ 1 x1)))
-                                 (define f2 (lambda (x2) (+ 2 x2)))
-                                 (define f3 (lambda (f1 f2) (lambda (x) (equal? (f1 0 x) (f2 x)))))
-                                 ((f3 < integer?) 20)))
+                 #;(run-interpreter `((define a 10) (define b 16) (define f1 (lambda (x1) (+ 1 x1))) (define f2 (lambda (x2) (+ 2 x2))) (define f3 (lambda (f1 f2) (lambda (x) (+ (f1 x) (f2 x))))) ((f3 f1 f2) 20)))
+
+
                  
