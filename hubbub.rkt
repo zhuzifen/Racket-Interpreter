@@ -191,9 +191,12 @@ Racket structs, feel free to switch this implementation to use a list/hash inste
 
 
 ;----------------------------------------------------------ERROR CHECKING FUNCTIONS-------------------------------------------------
+
+; check whether a identifier is defined twice
 (define (check-duplicate-define id env)
   (if (hash-has-key? env id) (report-error 'duplicate-name id) void))
 
+; check whether there is duplicate parameters
 (define (check-duplicate-param params)
   (cond
     [(empty? params) void]
@@ -203,6 +206,7 @@ Racket structs, feel free to switch this implementation to use a list/hash inste
      ])
   )
 
+; check whether a identifier refers to a function
 (define (check-function id env)
   (if
    (interpret env (list 'procedure? id)) (void)
@@ -210,6 +214,7 @@ Racket structs, feel free to switch this implementation to use a list/hash inste
    )
   )
 
+; check whether a identifier is not defined
 (define (check-unbound-name id env)
   (if
    (hash-has-key? env id) (void)
@@ -217,6 +222,7 @@ Racket structs, feel free to switch this implementation to use a list/hash inste
    )
   )
 
+; return whether contract expressions in the list are either built-in functions or user-defined functions
 (define (is-con-expr-defined con-exprs env)
   (let ([first-con-expr (first con-exprs)])
     (cond
@@ -231,6 +237,7 @@ Racket structs, feel free to switch this implementation to use a list/hash inste
        ])
     ))
 
+; check if a contract is valid
 (define (check-invalid-contract id params contract env)
   (match contract
     [(list con-expr-for-params ... '-> con-expr-for-return)
