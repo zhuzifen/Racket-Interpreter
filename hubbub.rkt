@@ -56,7 +56,7 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
   )
 
 ;------------------------------------------------------CONTRACT VIOLATION CHECK-----------------------------------------------------
-#|(define (check-contract-violation id args env)
+(define (check-contract-violation id args env)
   (match id
     ; only need to check contract violation on functions with identifiers
     [(? symbol?) (check-unbound-name id env)
@@ -96,7 +96,7 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
   (let ([f-value (interpret (hash 'args args) f-closure)])
     (is-satisfy-contract contract f-value)
     )
-  )|#
+  )
 
 ;-----------------------------------------------------------INTERPRETER MAIN CODE----------------------------------------------------------
 #|
@@ -182,9 +182,26 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
                (check-unbound-name possible-procedure env) void)
            (closure? (interpret env possible-procedure))] ; it's not a builtin
           )]
+         [else (builtins-arity-error expr)]
        )
-       )
+      )
 
+  )
+
+(define (builtins-arity-error expr)
+  (match expr
+    [(list ID args ...)
+     (let ([mismatch-with-params-len (lambda (params-len) (report-error 'arity-mismatch (length args) params-len))])
+       (match ID
+         ['< (mismatch-with-params-len 2) ]
+         ['equal? (mismatch-with-params-len 2)]
+         ['integer? (mismatch-with-params-len 1)]
+         ['boolean? (mismatch-with-params-len 1)]
+         ['procedure? (mismatch-with-params-len 1)]
+         )
+      )
+     
+     ])
   )
 
 ;-----------------------------------------------------------------------------------------
@@ -272,7 +289,6 @@ Racket structs, feel free to switch this implementation to use a list/hash inste
 #;(trace-call (run-interpreter '( (define f3 (lambda (f1) (f1 0 5)))
                                     (f3 <))))
 
-; TODO: builtin shadowing
 ; TODO: finish contract stuff
 ; TODO: checks for builtins
 
