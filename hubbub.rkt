@@ -156,20 +156,15 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
     [(list ID args ...)
      (let* ([interpret-with-env (lambda (arg) (interpret env arg))]
             [evaluated-args (map interpret-with-env args)])
-       (match ID
-        ; anon n-ary non; we get the closure of the lambda, then interpret it as a func call; our env contains params, as well as other identifiers
-        [(list 'lambda params body) (interpret (hash 'args evaluated-args) (closure params body env void)) ]  
-         [(anon function???) (interpret (hash 'args evaluated-args) (closure params body env void)) ]
-        [else
-        ; checks
-        (if (symbol? ID) (check-unbound-name ID env) void)
-        (check-function ID env)
-        (check-contract-violation ID args env)
-        ; finally we can start interpreting
-        (interpret (hash 'args evaluated-args) (hash-ref env ID))
-        ]) ; n-ary call; all we do is get the closure, then ask the interpreter to interpret the closure
-       )
-
+       ; checks
+       ;(if (symbol? ID) (check-unbound-name ID env) void)
+       ;(check-function ID env)
+       ;(check-contract-violation ID args env)
+       ; finally we can start interpreting
+       (interpret (hash 'args evaluated-args) (interpret env ID))
+       ;(interpret env ID)
+       ) ; n-ary call; all we do is get the closure, then ask the interpreter to interpret the closure
+       
      ]
     ; handle closure
     [(? closure?) (interpret (add-params-mapping (closure-env expr) (closure-params expr) (hash-ref env 'args))  (closure-body expr))] ; our env contains the args; we can use add-params-mapping to construt new env to eval our body
@@ -177,8 +172,6 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
     )
   )
 
-
-(define )
 
 ;-----------------------------------------------------------------------------------------
 ; Helpers: Builtins and closures
@@ -261,4 +254,4 @@ Racket structs, feel free to switch this implementation to use a list/hash inste
 ; TODO: fix hash table stuff for args >> functions 
 
 
-#;(interpret (hash 'args args) (interpret (hash) '(lambda (f1 x1) (f1 x1))))
+                 (run-interpreter `((define a 10) (define b 16) (define g1 (lambda (x1) (+ 1 x1))) (define g2 (lambda (x2) (+ 2 x2))) ((lambda (f1 f2 x1 x2) (+ (f1 x1) (f2 x2))) g1 g2 1 1)))
