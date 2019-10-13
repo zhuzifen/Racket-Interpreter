@@ -39,9 +39,10 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
   )
 
 (define (check-unbound-name id env)
-  (if
-   (hash-has-key? env id) (void)
-   (report-error 'unbound-name id)
+  (cond
+   [(hash-has-key? env id) (void)]
+   [(hash-has-key? builtins id) (void)]
+   [else (report-error 'unbound-name id)]
    )
   )
 
@@ -266,4 +267,11 @@ Racket structs, feel free to switch this implementation to use a list/hash inste
 ; TODO: fix hash table stuff for args >> functions 
 
 
-                 (run-interpreter `((define a 10) (define b 16) (define g1 (lambda (x1) (+ 1 x1))) (define g2 (lambda (x2) (+ 2 x2))) ((lambda (f1 f2 x1 x2) (+ (f1 x1) (f2 x2))) g1 g2 1 1)))
+#;(run-interpreter `((define a 10) (define b 16) (define g1 (lambda (x1) (+ 1 x1))) (define g2 (lambda (x2) (+ 2 x2))) ((lambda (f1 f2 x1 x2) (+ (f1 x1) (f2 x2))) g1 g2 1 1)))
+
+(run-interpreter `((define a 10) (define b 16)
+                                 (define f1 (lambda (x1) (+ 1 x1)))
+                                 (define f2 (lambda (x2) (+ 2 x2)))
+                                 (define f3 (lambda (f1 f2) (lambda (x) (equal? (f1 0 x) (f2 x)))))
+                                 ((f3 < integer?) 20)))
+                 
