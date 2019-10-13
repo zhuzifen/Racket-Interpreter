@@ -68,11 +68,32 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
   (let* ([f-closure (hash-ref env id)]
          [contract (closure-contract f-closure)])
     (match contract
-      [(list con-expr-for-args ... '-> con-expr-for-result) void]
+      [(list con-expr-for-args ... '-> con-expr-for-result) (and (is-args-good con-expr-for-args args) (is-result-good))]
       [else void])
     )
   )
 
+; we assume at this point that the contract is valid, so that the number of con-exprs is equal to that of args
+(define (is-args-good con-exprs args)
+  (let* ([update-contracts-violated-list
+          (lambda (contract contracts-violated-list)
+            (let ([arg (list-ref args (index-of con-exprs contract))])
+              (match contract
+               ['any contracts-violated-list]
+               [else (if (is-arg-satisfy-contract contract arg) (contracts-violated-list) (append contracts-violated-list (list contract))     )])
+              )
+             )]
+          [contracts-violated-list  (foldl update-contracts-violated-list (list) con-exprs)])
+    (empty? contracts-violated-list))
+  )
+
+(define (is-arg-satisfy-contract contract arg)
+  (interpret (hash) (list contract arg))
+  )
+
+(define (is-result-good)
+  void
+  )
 
 
 #|
@@ -104,8 +125,12 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
     [(? boolean?) expr]
     [(? symbol?)
      (check-unbound-name expr env)
-     (interpret env (hash-ref env expr))] ; handle variable
-    [(list '+ a b) (+ (interpret env a) (interpret env b))] ; handle builtin functions
+     (hash-ref env expr)] ; handle variable
+    [(list '+ addands ...) ; handle builtin functions
+     (let ([interpret-with-env (lambda (num) (interpret env num))])
+       (apply + (map interpret-with-env addands))
+       )
+     ] 
     [(list '< a b) (< (interpret env a) (interpret env b))]
     [(list 'equal? a b) (equal? (interpret env a) (interpret env b))]
     [(list 'integer? a) (integer? (interpret env a))]
@@ -126,21 +151,34 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
        )]
     ; handle lambda def, return closure
     [(list 'lambda params expr)
-     (check-duplicate-param params)
-     (closure params expr env void)]
+     (check-duplicate-param params) (closure params expr env void)]
     ; handle function call
     [(list ID args ...)
-     (match ID
-       [(list 'lambda params expr) (interpret (add-params-mapping env params args ) expr) ] ; anon n-ary non 
-       [else
+     (let* ([interpret-with-env (lambda (arg) (interpret env arg))]
+            [evaluated-args (map interpret-with-env args)])
+       (match ID
+        ; anon n-ary non; we get the closure of the lambda, then interpret it as a func call; our env contains params, as well as other identifiers
+        [(list 'lambda params body) (interpret (hash 'args evaluated-args) (closure params body env void)) ]  
+         [(anon function???) (interpret (hash 'args evaluated-args) (closure params body env void)) ]
+        [else
+        ; checks
         (if (symbol? ID) (check-unbound-name ID env) void)
         (check-function ID env)
         (check-contract-violation ID args env)
-        (interpret (add-params-mapping (closure-env (hash-ref env ID)) (closure-params (hash-ref env ID)) args ) (closure-body (hash-ref env ID)))]) ; n-ary call
-     ] 
+        ; finally we can start interpreting
+        (interpret (hash 'args evaluated-args) (hash-ref env ID))
+        ]) ; n-ary call; all we do is get the closure, then ask the interpreter to interpret the closure
+       )
+
+     ]
+    ; handle closure
+    [(? closure?) (interpret (add-params-mapping (closure-env expr) (closure-params expr) (hash-ref env 'args))  (closure-body expr))] ; our env contains the args; we can use add-params-mapping to construt new env to eval our body
+    ;[(? closure?) (add-params-mapping (closure-env expr) (closure-params expr) (hash-ref env 'args))]
     )
   )
 
+
+(define )
 
 ;-----------------------------------------------------------------------------------------
 ; Helpers: Builtins and closures
@@ -201,22 +239,26 @@ Racket structs, feel free to switch this implementation to use a list/hash inste
 (define (add-params-mapping env params args)
   (if (equal? (length params) (length args)) 
       (let
-          ([update-params-mapping (lambda(param params-mapping) (hash-set params-mapping param (interpret env (list-ref args (index-of params param))) ) )])
+          ([update-params-mapping (lambda(param params-mapping) (hash-set params-mapping param (list-ref args (index-of params param)) ) )])
         (foldl update-params-mapping env params)
         )
       (report-error 'arity-mismatch (length args) (length params))
       )
   )
 
+
 ;(add-params-mapping (build-env '((define a 4) (define b 4))) (list) (list))
 
-(run-interpreter '((define a (+ 4 4))
+#;(run-interpreter '((define a (+ 4 4))
                    (define b 4)
                    (define c #f)
                    (+ a b) ))
 
 
 
-; TODO: define an anon, then call it >> this does not seem to require a closure
 ; TODO: builtin shadowing
-; unbound name issues
+; TODO: finish contract stuff
+; TODO: fix hash table stuff for args >> functions 
+
+
+#;(interpret (hash 'args args) (interpret (hash) '(lambda (f1 x1) (f1 x1))))
