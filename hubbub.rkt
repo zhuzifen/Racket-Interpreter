@@ -18,84 +18,6 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
 ; Main functions (skeleton provided in starter code)
 ;-----------------------------------------------------------------------------------------
 
-;Error checking functions
-(define (check-duplicate-define id env)
-  (if (hash-has-key? env id) (report-error 'duplicate-name id) void))
-
-(define (check-duplicate-param params)
-  (cond
-    [(empty? params) void]
-    [(member (first params) (rest params)) (report-error 'duplicate-name (first params))]
-    [else
-     (check-duplicate-param (rest params))
-     ])
-  )
-
-(define (check-function id env)
-  (if
-   (interpret env (list 'procedure? id)) (void)
-   (report-error 'not-a-function id)
-   )
-  )
-
-(define (check-unbound-name id env)
-  (if
-   (hash-has-key? env id) (void)
-   (report-error 'unbound-name id)
-   )
-  )
-
-(define (check-invalid-contract id params contract)
-    (match contract
-      [(list con-expr-for-params ... '-> con-expr-for-return)
-       (if (equal? (length params) (length con-expr-for-params)) (void)
-           (report-error 'invalid-contract id))
-       ]
-      [else void]
-      )
-  )
-
-;------------------------------------------------------CONTRACT VIOLATION CHECK-----------------------------------------------------
-(define (check-contract-violation id args env)
-  (match id
-    ; only need to check contract violation on functions with identifiers
-    [(? symbol?) (check-unbound-name id env)
-     (let* ([f-closure (hash-ref env id)]
-         [contract (closure-contract f-closure)])
-    (match contract
-      [(list con-expr-for-args ... '-> con-expr-for-result)
-       (if (and (is-args-good con-expr-for-args args) (is-result-good con-expr-for-result args f-closure))
-           (void)
-           (report-error 'contract-violation))
-       ]
-      ; there is no contract, so don't bother checking 
-      [else void])
-    )]
-    ; it's an anon func, so no need to check for contract violations
-    [else void]
-    ))
-
-; we assume at this point that the contract is valid, so that the number of con-exprs is equal to that of args
-(define (is-args-good con-exprs args)
-  (let* ([is-satisfy-contract-for-arg (lambda (contract) (is-satisfy-contract contract (list-ref args (index-of con-exprs contract))))])
-    (andmap is-satisfy-contract-for-arg con-exprs)
-    )
-  )
-
-(define (is-satisfy-contract contract value)
-  (match contract
-    ; anything works 
-    ['any #t]
-    ; contract is a predicate, so just call it using our interpreter
-    [else (interpret builtins (list contract value))]
-    )
-  )
-
-(define (is-result-good contract args f-closure) 
-  (let ([f-value (interpret (hash 'args args) f-closure)])
-    (is-satisfy-contract contract f-value)
-    )
-  )
 
 ;-----------------------------------------------------------INTERPRETER MAIN CODE----------------------------------------------------------
 #|
@@ -123,12 +45,12 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
 |#
 (define (interpret env expr)
   (match expr
-    [(? number?) expr] ; handle literals
+    [(? number?) expr] 
     [(? boolean?) expr]
     [(? symbol?)
      (check-unbound-name expr env)
-     (hash-ref env expr)] ; handle variable
-    ; handle lambda def, return closure
+     (hash-ref env expr)]
+    ; handle lambda def by returning closure
     [(list 'lambda params expr)
      (check-duplicate-param params) (closure params expr env void)]
     ; handle function call
@@ -139,73 +61,63 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
         (let* ([interpret-with-env (lambda (arg) (interpret env arg))]
                [evaluated-args (map interpret-with-env args)])
           ; checks
-          ;(if (symbol? ID)
           (check-function ID env)
           (check-contract-violation ID evaluated-args env)
-          ; finally we can start interpreting
           (interpret (hash 'args evaluated-args) (interpret env ID))
 
           )
         ]) 
      ]
-    ; handle closure
-    [(? closure?) (interpret (add-params-mapping (closure-env expr) (closure-params expr) (hash-ref env 'args))  (closure-body expr))] ; our env contains the args; we can use add-params-mapping to construt new env to eval our body
-    ;[(? closure?) (list (add-params-mapping (closure-env expr) (closure-params expr) (hash-ref env 'args)) (closure-body expr)) ]
+    ; our env contains the args; we can use add-params-mapping to construt new env to eval our body
+    [(? closure?) (interpret (add-params-mapping (closure-env expr) (closure-params expr) (hash-ref env 'args))  (closure-body expr))] 
     )
   )
 
-; our assumption is that ID-ref refers to the original builtin, not any shadowed version
-(define (handle-builtin ID-ref env expr)
-  (let* ([actual-expr (append (list ID-ref) (rest expr))])
-       (match actual-expr
-       [(list '+ addands ...) ; handle builtin functions
-        (let ([interpret-with-env (lambda (num) (interpret env num))])
-          (apply + (map interpret-with-env addands))
-          )
-        ] 
-       [(list '< a b) (< (interpret env a) (interpret env b))]
-       [(list 'equal? a b) (equal? (interpret env a) (interpret env b))]
-       [(list 'integer? a) (integer? (interpret env a))]
-       [(list  'boolean? a) (boolean? (interpret env a))]
-       ; check whether procedure
-       [(list 'procedure? possible-procedure)
-        (match possible-procedure
-          ['+ #t] ; build in functions are procedures
-          ['< #t]
-          ['equal? #t]
-          ['integer? #t]
-          ['boolean? #t]
-          ['procedure? #t]
-          [else
-           (if (symbol? possible-procedure)
-               (check-unbound-name possible-procedure env) void)
-           (closure? (interpret env possible-procedure))] ; it's not a builtin
-          )]
-         [else (builtins-arity-error expr)]
-       )
-      )
 
-  )
 
-(define (builtins-arity-error expr)
-  (match expr
-    [(list ID args ...)
-     (let ([mismatch-with-params-len (lambda (params-len) (report-error 'arity-mismatch (length args) params-len))])
-       (match ID
-         ['< (mismatch-with-params-len 2) ]
-         ['equal? (mismatch-with-params-len 2)]
-         ['integer? (mismatch-with-params-len 1)]
-         ['boolean? (mismatch-with-params-len 1)]
-         ['procedure? (mismatch-with-params-len 1)]
-         )
-      )
-     
-     ])
-  )
+
 
 ;-----------------------------------------------------------------------------------------
 ; Helpers: Builtins and closures
 ;-----------------------------------------------------------------------------------------
+
+; run expr, a builtin call, and evaluate according to the corresponding builtin function 
+(define (handle-builtin ID-ref env expr)
+  ; our assumption is that ID-ref refers to the original builtin, not any shadowed version
+  (let* ([actual-expr (append (list ID-ref) (rest expr))])
+    (match actual-expr
+      ; handle builtin functions
+      [(list '+ addands ...) 
+       (let ([interpret-with-env (lambda (num) (interpret env num))])
+         (apply + (map interpret-with-env addands))
+         )
+       ] 
+      [(list '< a b) (< (interpret env a) (interpret env b))]
+      [(list 'equal? a b) (equal? (interpret env a) (interpret env b))]
+      [(list 'integer? a) (integer? (interpret env a))]
+      [(list  'boolean? a) (boolean? (interpret env a))]
+      ; check whether procedure
+      [(list 'procedure? possible-procedure)
+       (match possible-procedure
+         ['+ #t]
+         ['< #t]
+         ['equal? #t]
+         ['integer? #t]
+         ['boolean? #t]
+         ['procedure? #t]
+         [else
+          (if (symbol? possible-procedure)
+              (check-unbound-name possible-procedure env) void)
+          ; it's not a builtin
+          (closure? (interpret env possible-procedure))] 
+         )]
+      [else (builtins-arity-error expr)]
+      )
+    )
+
+  )
+
+
 ; A hash mapping symbols for Hubbub builtin functions to their corresponding Racket value.
 (define builtins
   (hash
@@ -219,7 +131,7 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
    'procedure? 'procedure?
    ))
 
-; builtin when identifier refers to the original builtin
+; return whether identifier refers to the original builtin
 (define (builtin? identifier env)
   (hash-has-key? builtins (interpret env identifier))
   )
@@ -258,7 +170,7 @@ Racket structs, feel free to switch this implementation to use a list/hash inste
             [body (closure-body orig-closure)]
             [env (closure-env orig-closure)]
             [new-closure (closure params body env contract)])
-       (check-invalid-contract ID params contract)
+       (check-invalid-contract ID params contract env)
        (hash-set env ID new-closure)
        )
      ;(check-invalid-contract ID env)
@@ -266,6 +178,7 @@ Racket structs, feel free to switch this implementation to use a list/hash inste
     )
   )
 
+; return a new mapping, starting with env, such that params are mapped to their corresponding args
 (define (add-params-mapping env params args)
   (if (equal? (length params) (length args)) 
       (let
@@ -277,32 +190,119 @@ Racket structs, feel free to switch this implementation to use a list/hash inste
   )
 
 
-#;(run-interpreter '((define a (+ 4 4))
-                     (define b 4)
-                     (define c #f)
-                     (+ a b) ))
+;----------------------------------------------------------ERROR CHECKING FUNCTIONS-------------------------------------------------
+(define (check-duplicate-define id env)
+  (if (hash-has-key? env id) (report-error 'duplicate-name id) void))
 
-;-------------------------------------------------------------DEBUGGING-----------------------------------------------
-(require racket/trace)
+(define (check-duplicate-param params)
+  (cond
+    [(empty? params) void]
+    [(member (first params) (rest params)) (report-error 'duplicate-name (first params))]
+    [else
+     (check-duplicate-param (rest params))
+     ])
+  )
 
-#;(trace-call (run-interpreter '( (define f3 (lambda (f1) (f1 0 5)))
-                                    (f3 <))))
+(define (check-function id env)
+  (if
+   (interpret env (list 'procedure? id)) (void)
+   (report-error 'not-a-function id)
+   )
+  )
 
-; TODO: finish contract stuff
-; TODO: checks for builtins
+(define (check-unbound-name id env)
+  (if
+   (hash-has-key? env id) (void)
+   (report-error 'unbound-name id)
+   )
+  )
 
-                 #;(run-interpreter '((define a 10)
-                                    (define b 16)
-                                    (define f1 (lambda (x1) (+ 1 x1)))
-                                    (define f2 (lambda (x2) (+ 2 x2)))
-                                    (define f3 (lambda (f1 f2) (lambda (x) (equal? (f1 0 x) (f2 x)))))
-                                    ((f3 < integer?) 20)))
+(define (is-con-expr-defined con-exprs env)
+  (let ([first-con-expr (first con-exprs)])
+    (cond
+      [(equal? (length con-exprs) 1)
+       (if (hash-has-key? env first-con-expr) #t
+           (match first-con-expr
+             [(list 'lambda params expr) #t]
+             [else #f]
+             ))]       
+      [else
+       (and (is-con-expr-defined (list first-con-expr) env) (is-con-expr-defined (rest con-exprs) env))
+       ])
+    ))
 
+(define (check-invalid-contract id params contract env)
+  (match contract
+    [(list con-expr-for-params ... '-> con-expr-for-return)
+     (if (and (is-con-expr-defined con-expr-for-params env) (is-con-expr-defined (list con-expr-for-return) env))
+         (void)
+         (report-error 'invalid-contract id))
+     (if (equal? (length params) (length con-expr-for-params)) (void)
+         (report-error 'invalid-contract id))
+     ]
+    [else void]
+    )
+  )
 
-(run-interpreter '( (define f3 (lambda (f1) (f1 0 5)))
-                                    (f3 <)))
+; raise arity mismatch error for builtins
+(define (builtins-arity-error expr)
+  (match expr
+    [(list ID args ...)
+     (let ([mismatch-with-params-len (lambda (params-len) (report-error 'arity-mismatch (length args) params-len))])
+       (match ID
+         ['< (mismatch-with-params-len 2) ]
+         ['equal? (mismatch-with-params-len 2)]
+         ['integer? (mismatch-with-params-len 1)]
+         ['boolean? (mismatch-with-params-len 1)]
+         ['procedure? (mismatch-with-params-len 1)]
+         )
+       )   
+     ])
+  )
 
-                 #;(run-interpreter `((define a 10) (define b 16) (define f1 (lambda (x1) (+ 1 x1))) (define f2 (lambda (x2) (+ 2 x2))) (define f3 (lambda (f1 f2) (lambda (x) (+ (f1 x) (f2 x))))) ((f3 f1 f2) 20)))
+;------------------------------------------------------CONTRACT VIOLATION CHECK-----------------------------------------------------
+(define (check-contract-violation id args env)
+  (match id
+    ; only need to check contract violation on functions with identifiers
+    [(? symbol?) (check-unbound-name id env)
+                 (let* ([f-closure (hash-ref env id)]
+                        [contract (closure-contract f-closure)])
+                   (match contract
+                     [(list con-expr-for-args ... '-> con-expr-for-result)
+                      (if (and (is-args-good con-expr-for-args args) (is-result-good con-expr-for-result args f-closure))
+                          (void)
+                          (report-error 'contract-violation))
+                      ]
+                     ; there is no contract, so don't bother checking 
+                     [else void])
+                   )]
+    ; it's an anon func, so no need to check for contract violations
+    [else void]
+    ))
 
+; return whether args satitisfy their corresponding contract expression in con-exprs
+(define (is-args-good con-exprs args)
+  ; we assume at this point that the contract is valid, so that the number of con-exprs is equal to that of args
+  (let* ([is-satisfy-contract-for-arg (lambda (contract) (is-satisfy-contract contract (list-ref args (index-of con-exprs contract))))])
+    (andmap is-satisfy-contract-for-arg con-exprs)
+    )
+  )
+
+; return whether value satisfies the contract
+(define (is-satisfy-contract contract value)
+  (match contract
+    ; anything works 
+    ['any #t]
+    ; contract is a predicate, so just call it using our interpreter
+    [else (interpret builtins (list contract value))]
+    )
+  )
+
+; returns whether the result of evaluating f-closure given args satisfies contract
+(define (is-result-good contract args f-closure) 
+  (let ([f-value (interpret (hash 'args args) f-closure)])
+    (is-satisfy-contract contract f-value)
+    )
+  )
 
                  
