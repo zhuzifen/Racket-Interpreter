@@ -64,11 +64,13 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
     )
   )
 
+; TODO: for Kai
 (define (check-contract-violation id args env)
   (let* ([f-closure (hash-ref env id)]
          [contract (closure-contract f-closure)])
     (match contract
       [(list con-expr-for-args ... '-> con-expr-for-result) (and (is-args-good con-expr-for-args args) (is-result-good))]
+      ; there is no contract, so don't bother checking 
       [else void])
     )
   )
@@ -79,20 +81,30 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
           (lambda (contract contracts-violated-list)
             (let ([arg (list-ref args (index-of con-exprs contract))])
               (match contract
+               ; no violation if any value is accepted
                ['any contracts-violated-list]
-               [else (if (is-arg-satisfy-contract contract arg) (contracts-violated-list) (append contracts-violated-list (list contract))     )])
+               ; we need to 
+               [else (if (is-satisfy-contract contract arg) (contracts-violated-list) (append contracts-violated-list (list contract))     )])
               )
              )]
           [contracts-violated-list  (foldl update-contracts-violated-list (list) con-exprs)])
+    ; args satisfy the contract, since the contracts violated list is empty
     (empty? contracts-violated-list))
   )
 
-(define (is-arg-satisfy-contract contract arg)
-  (interpret (hash) (list contract arg))
+(define (is-satisfy-contract contract value)
+  (interpret (hash) (list contract value))
   )
 
-(define (is-result-good)
-  void
+(define (is-result-good contract function )
+  (let [f-value ]
+    (is-satisfy-contract contract value))
+  )
+
+(define (is-args-good con-exprs args)
+  (let* ([])
+    (andmap is-satisfy-contract con-exprs)
+    )
   )
 
 
