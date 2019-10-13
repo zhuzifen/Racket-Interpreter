@@ -39,10 +39,9 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
   )
 
 (define (check-unbound-name id env)
-  (cond
-   [(hash-has-key? env id) (void)]
-   [(hash-has-key? builtins id) (void)]
-   [else (report-error 'unbound-name id)]
+  (if
+   (hash-has-key? env id) (void)
+  (report-error 'unbound-name id)
    )
   )
 
@@ -210,7 +209,7 @@ Racket structs, feel free to switch this implementation to use a list/hash inste
 
 ; environment builders
 (define (build-env bindings-or-contracts) 
-  (foldl update_env (hash) bindings-or-contracts))
+  (foldl update_env builtins bindings-or-contracts))
 
 (define (update_env binding-or-contract env)
   (match binding-or-contract
