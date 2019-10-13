@@ -65,7 +65,7 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
   )
 
 ; TODO: for Kai
-(define (check-contract-violation id args env)
+#;(define (check-contract-violation id args env)
   (let* ([f-closure (hash-ref env id)]
          [contract (closure-contract f-closure)])
     (match contract
@@ -76,7 +76,7 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
   )
 
 ; we assume at this point that the contract is valid, so that the number of con-exprs is equal to that of args
-(define (is-args-good con-exprs args)
+#;(define (is-args-good con-exprs args)
   (let* ([update-contracts-violated-list
           (lambda (contract contracts-violated-list)
             (let ([arg (list-ref args (index-of con-exprs contract))])
@@ -92,16 +92,16 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
     (empty? contracts-violated-list))
   )
 
-(define (is-satisfy-contract contract value)
+#;(define (is-satisfy-contract contract value)
   (interpret (hash) (list contract value))
   )
 
-(define (is-result-good contract function )
+#;(define (is-result-good contract function )
   (let [f-value ]
     (is-satisfy-contract contract value))
   )
 
-(define (is-args-good con-exprs args)
+#;(define (is-args-good con-exprs args)
   (let* ([])
     (andmap is-satisfy-contract con-exprs)
     )
@@ -156,10 +156,10 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
        ['integer? #t]
        ['boolean? #t]
        ['procedure? #t]
-       [(list 'lambda params expr) #t] ; anon function
-       [(? symbol?)
-        (check-unbound-name possible-procedure env)
-        (closure? (hash-ref env possible-procedure))] ; identifier refers to a closure in env; TODO: consider case where possible-procedure isn't even defined
+       [else
+        (if (symbol? possible-procedure)
+        (check-unbound-name possible-procedure env) void)
+        (closure? (interpret env possible-procedure))] ; it's not a builtin
        )]
     ; handle lambda def, return closure
     [(list 'lambda params expr)
@@ -169,8 +169,8 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
      (let* ([interpret-with-env (lambda (arg) (interpret env arg))]
             [evaluated-args (map interpret-with-env args)])
        ; checks
-       ;(if (symbol? ID) (check-unbound-name ID env) void)
-       ;(check-function ID env)
+       ;(if (symbol? ID)
+       (check-function ID env)
        ;(check-contract-violation ID args env)
        ; finally we can start interpreting
        (interpret (hash 'args evaluated-args) (interpret env ID))
