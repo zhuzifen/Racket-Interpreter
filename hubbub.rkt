@@ -41,19 +41,11 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
 (define (check-unbound-name id env)
   (if
    (hash-has-key? env id) (void)
-  (report-error 'unbound-name id)
+   (report-error 'unbound-name id)
    )
   )
 
-(define (check-invalid-contract id env)
-  (check-unbound-name id env)
-  (if
-   (interpret env (list 'procedure? id)) (void)
-   (report-error 'invalid-contract id)
-   )
-  (let* ([f-closure (hash-ref env id)]
-         [contract (closure-contract f-closure)]
-         [params (closure-params f-closure)])
+(define (check-invalid-contract id params contract)
     (match contract
       [(list con-expr-for-params ... '-> con-expr-for-return)
        (if (equal? (length params) (length con-expr-for-params)) (void)
@@ -61,14 +53,14 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
        ]
       [else void]
       )
-    )
   )
 
 ;------------------------------------------------------CONTRACT VIOLATION CHECK-----------------------------------------------------
-(define (check-contract-violation id args env)
+#|(define (check-contract-violation id args env)
   (match id
     ; only need to check contract violation on functions with identifiers
-    [(? symbol?) (let* ([f-closure (hash-ref env id)]
+    [(? symbol?) (check-unbound-name id env)
+     (let* ([f-closure (hash-ref env id)]
          [contract (closure-contract f-closure)])
     (match contract
       [(list con-expr-for-args ... '-> con-expr-for-result)
@@ -86,7 +78,7 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
 
 ; we assume at this point that the contract is valid, so that the number of con-exprs is equal to that of args
 (define (is-args-good con-exprs args)
-  (let* ([is-satisfy-contract-for-arg (lambda (contract) (is-satisfy-contract contract (list-ref args (index-of con-exprs contract))) )])
+  (let* ([is-satisfy-contract-for-arg (lambda (contract) (is-satisfy-contract contract (list-ref args (index-of con-exprs contract))))])
     (andmap is-satisfy-contract-for-arg con-exprs)
     )
   )
@@ -104,7 +96,7 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
   (let ([f-value (interpret (hash 'args args) f-closure)])
     (is-satisfy-contract contract f-value)
     )
-  )
+  )|#
 
 ;-----------------------------------------------------------INTERPRETER MAIN CODE----------------------------------------------------------
 #|
@@ -157,7 +149,7 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
        ['procedure? #t]
        [else
         (if (symbol? possible-procedure)
-        (check-unbound-name possible-procedure env) void)
+            (check-unbound-name possible-procedure env) void)
         (closure? (interpret env possible-procedure))] ; it's not a builtin
        )]
     ; handle lambda def, return closure
@@ -170,7 +162,7 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
        ; checks
        ;(if (symbol? ID)
        (check-function ID env)
-       (check-contract-violation ID evaluated-args env)
+       ;(check-contract-violation ID evaluated-args env)
        ; finally we can start interpreting
        (interpret (hash 'args evaluated-args) (interpret env ID))
        ;(interpret env ID)
@@ -215,9 +207,9 @@ Racket structs, feel free to switch this implementation to use a list/hash inste
 
 ; environment builders
 (define (build-env bindings-or-contracts) 
-  (foldl update_env (hash) bindings-or-contracts))
+  (foldl update-env (hash) bindings-or-contracts))
 
-(define (update_env binding-or-contract env)
+(define (update-env binding-or-contract env)
   (match binding-or-contract
     [(list 'define ID b) ; case binding 
      (check-duplicate-define ID env)
@@ -227,15 +219,20 @@ Racket structs, feel free to switch this implementation to use a list/hash inste
        )
      ]
     [(list 'define-contract ID contract)
-     (check-invalid-contract ID env)
+     (check-unbound-name ID env)
+     (if
+      (interpret env (list 'procedure? ID)) (void)
+      (report-error 'invalid-contract ID)
+      )
      (let* ([orig-closure (hash-ref env ID)] 
             [params (closure-params orig-closure)]
             [body (closure-body orig-closure)]
             [env (closure-env orig-closure)]
             [new-closure (closure params body env contract)])
-       (hash-set env ID new-closure) 
+       (check-invalid-contract ID params contract)
+       (hash-set env ID new-closure)
        )
-
+     ;(check-invalid-contract ID env)
      ] ; case contract
     )
   )
@@ -254,9 +251,9 @@ Racket structs, feel free to switch this implementation to use a list/hash inste
 ;(add-params-mapping (build-env '((define a 4) (define b 4))) (list) (list))
 
 #;(run-interpreter '((define a (+ 4 4))
-                   (define b 4)
-                   (define c #f)
-                   (+ a b) ))
+                     (define b 4)
+                     (define c #f)
+                     (+ a b) ))
 
 
 
@@ -267,9 +264,14 @@ Racket structs, feel free to switch this implementation to use a list/hash inste
 
 #;(run-interpreter `((define a 10) (define b 16) (define g1 (lambda (x1) (+ 1 x1))) (define g2 (lambda (x2) (+ 2 x2))) ((lambda (f1 f2 x1 x2) (+ (f1 x1) (f2 x2))) g1 g2 1 1)))
 
-(run-interpreter `((define a 10) (define b 16)
-                                 (define f1 (lambda (x1) (+ 1 x1)))
-                                 (define f2 (lambda (x2) (+ 2 x2)))
-                                 (define f3 (lambda (f1 f2) (lambda (x) (equal? (f1 0 x) (f2 x)))))
-                                 ((f3 < integer?) 20)))
-                 
+#;(run-interpreter `((define a 10) (define b 16)
+                                   (define f1 (lambda (x1) (+ 1 x1)))
+                                   (define f2 (lambda (x2) (+ 2 x2)))
+                                   (define f3 (lambda (f1 f2) (lambda (x) (equal? (f1 0 x) (f2 x)))))
+                                   ((f3 < integer?) 20)))
+
+(run-interpreter '((define a 10)
+                   (define f (lambda (x) (< x 3)))
+                   (define-contract f (integer? boolean? -> boolean?))
+                   (f 1)))
+
