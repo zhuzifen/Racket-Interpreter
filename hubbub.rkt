@@ -64,50 +64,43 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
     )
   )
 
-; TODO: for Kai
-#;(define (check-contract-violation id args env)
-  (let* ([f-closure (hash-ref env id)]
+;------------------------------------------------------CONTRACT VIOLATION CHECK-----------------------------------------------------
+(define (check-contract-violation id args env)
+  (match id
+    ; only need to check contract violation on functions with identifiers
+    [(? symbol?) (let* ([f-closure (hash-ref env id)]
          [contract (closure-contract f-closure)])
     (match contract
-      [(list con-expr-for-args ... '-> con-expr-for-result) (and (is-args-good con-expr-for-args args) (is-result-good))]
+      [(list con-expr-for-args ... '-> con-expr-for-result) (and (is-args-good con-expr-for-args args) (is-result-good con-expr-for-result args f-closure))]
       ; there is no contract, so don't bother checking 
       [else void])
+    )]
+    [else void]
     )
+
+
+  
   )
 
 ; we assume at this point that the contract is valid, so that the number of con-exprs is equal to that of args
-#;(define (is-args-good con-exprs args)
-  (let* ([update-contracts-violated-list
-          (lambda (contract contracts-violated-list)
-            (let ([arg (list-ref args (index-of con-exprs contract))])
-              (match contract
-               ; no violation if any value is accepted
-               ['any contracts-violated-list]
-               ; we need to 
-               [else (if (is-satisfy-contract contract arg) (contracts-violated-list) (append contracts-violated-list (list contract))     )])
-              )
-             )]
-          [contracts-violated-list  (foldl update-contracts-violated-list (list) con-exprs)])
-    ; args satisfy the contract, since the contracts violated list is empty
-    (empty? contracts-violated-list))
-  )
-
-#;(define (is-satisfy-contract contract value)
-  (interpret (hash) (list contract value))
-  )
-
-#;(define (is-result-good contract function )
-  (let [f-value ]
-    (is-satisfy-contract contract value))
-  )
-
-#;(define (is-args-good con-exprs args)
-  (let* ([])
-    (andmap is-satisfy-contract con-exprs)
+(define (is-args-good con-exprs args)
+  (let* ([is-satisfy-contract-for-arg (lambda (contract) (is-satisfy-contract contract (list-ref args (index-of con-exprs contract))) )])
+    (andmap is-satisfy-contract-for-arg con-exprs)
     )
   )
 
+(define (is-satisfy-contract contract value)
+  ; contract is a predicate, so just call it using our interpreter
+  (interpret (hash) (list contract value))
+  )
 
+(define (is-result-good contract args f-closure) 
+  (let ([f-value (interpret (hash 'args args) f-closure)])
+    (is-satisfy-contract contract f-value)
+    )
+  )
+
+;-----------------------------------------------------------INTERPRETER MAIN CODE----------------------------------------------------------
 #|
 (run-interpreter prog) -> any
   prog: datum?
@@ -171,7 +164,7 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
        ; checks
        ;(if (symbol? ID)
        (check-function ID env)
-       ;(check-contract-violation ID args env)
+       (check-contract-violation ID evaluated-args env)
        ; finally we can start interpreting
        (interpret (hash 'args evaluated-args) (interpret env ID))
        ;(interpret env ID)
