@@ -80,7 +80,7 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
             (let ([arg (list-ref args (index-of con-exprs contract))])
               (match contract
                ['any contracts-violated-list]
-               [else (if (is-arg-satisfy-contract contract arg) (contracts-violated-list) (append contracts-violated-list (list contract))     )])
+               [else (if (is-arg-satisfy-contract contract arg) (contracts-violated-list) (append contracts-violated-list (list contract)))])
               )
              )]
           [contracts-violated-list  (foldl update-contracts-violated-list (list) con-exprs)])
@@ -144,10 +144,10 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
        ['integer? #t]
        ['boolean? #t]
        ['procedure? #t]
-       [(list 'lambda params expr) #t] ; anon function
-       [(? symbol?)
-        (check-unbound-name possible-procedure env)
-        (closure? (hash-ref env possible-procedure))] ; identifier refers to a closure in env; TODO: consider case where possible-procedure isn't even defined
+       [else
+        (if (symbol? possible-procedure)
+        (check-unbound-name possible-procedure env) void)
+        (closure? (interpret env possible-procedure))] ; it's not a builtin
        )]
     ; handle lambda def, return closure
     [(list 'lambda params expr)
@@ -157,8 +157,8 @@ https://www.cs.toronto.edu/~david/csc324/assignments/a1/handout.html
      (let* ([interpret-with-env (lambda (arg) (interpret env arg))]
             [evaluated-args (map interpret-with-env args)])
        ; checks
-       ;(if (symbol? ID) (check-unbound-name ID env) void)
-       ;(check-function ID env)
+       ;(if (symbol? ID)
+       (check-function ID env)
        ;(check-contract-violation ID args env)
        ; finally we can start interpreting
        (interpret (hash 'args evaluated-args) (interpret env ID))
